@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Record start time
+      run: echo "START_TS=$(date +%s)" >> $GITHUB_ENV
+
     - name: Maximize build space
       uses: easimon/maximize-build-space@master
       with:
@@ -87,6 +90,25 @@ jobs:
         [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
         chmod +x $OPENWRT_NAME/*.sh && cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
+        # 开启 ccache，配合下方缓存加速后续编译
+        echo "CONFIG_CCACHE=y" >> .config
+
+    # tools/toolchain 只取决于源码版本和目标平台，缓存后可省约 2 小时
+    - name: Restore toolchain cache
+      id: toolchain-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          openwrt/staging_dir/host
+          openwrt/staging_dir/toolchain-*
+        key: toolchain-${{ env.REPO_BRANCH }}-x86_64-ccache-v1
+
+    - name: Restore ccache
+      uses: actions/cache/restore@v4
+      with:
+        path: openwrt/.ccache
+        key: ccache-${{ env.REPO_BRANCH }}-x86_64-${{ github.run_id }}
+        restore-keys: ccache-${{ env.REPO_BRANCH }}-x86_64-
 
     - name: Download the installation package
       id: package
@@ -97,16 +119,43 @@ jobs:
         make download -j$(nproc)
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-             
+
+    - name: Compile tools and toolchain
+      if: steps.toolchain-cache.outputs.cache-hit != 'true'
+      run: |
+        cd openwrt
+        make tools/install -j$(nproc) || make tools/install -j1 V=s
+        make toolchain/install -j$(nproc) || make toolchain/install -j1 V=s
+
+    - name: Save toolchain cache
+      if: steps.toolchain-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          openwrt/staging_dir/host
+          openwrt/staging_dir/toolchain-*
+        key: ${{ steps.toolchain-cache.outputs.cache-primary-key }}
+
     - name: Compile the firmware
       id: compile
       run: |
         cd openwrt
-        echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
+        # tools/toolchain 已就绪（缓存恢复或上一步刚编好），去掉顶层依赖避免因源码时间戳较新而重编
+        sed -i 's/ $(tool.*\/stamp-compile)//;' Makefile
+        # 在 6 小时硬上限前主动停止，留时间保存 ccache
+        remaining=$(( START_TS + 340*60 - $(date +%s) ))
+        echo "$(nproc) thread compile, time budget $((remaining/60)) min"
+        timeout ${remaining}s bash -c 'make -j$(nproc) || make -j1 V=s'
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
         echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Save ccache
+      if: always()
+      uses: actions/cache/save@v4
+      with:
+        path: openwrt/.ccache
+        key: ccache-${{ env.REPO_BRANCH }}-x86_64-${{ github.run_id }}
 
     - name: Organize and Rename Files
       id: organize
