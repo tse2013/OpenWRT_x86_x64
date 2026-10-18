@@ -22,7 +22,7 @@ git clone --depth=1 https://github.com/Openwrt-Passwall/openwrt-passwall2
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 git clone --depth=1 https://github.com/DHDAXCW/dhdaxcw-app
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
-git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
+# Argon 3.0 起配置页已并入主题，不再单独克隆 luci-app-argon-config（会与主题文件冲突）
 # 25.12 使用 apk：需上游 istoreos/istore 0.2.x（支持 apk 及 repo-apk 源），DHDAXCW/istore 0.1.x 仅支持 opkg
 git clone --depth=1 https://github.com/istoreos/istore
 git clone --depth=1 https://github.com/Siriling/5G-Modem-Support && rm -rf 5G-Modem-Support/rooter
