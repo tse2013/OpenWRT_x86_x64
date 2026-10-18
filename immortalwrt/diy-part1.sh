@@ -23,7 +23,8 @@ git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 git clone --depth=1 https://github.com/DHDAXCW/dhdaxcw-app
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
-git clone --depth=1 https://github.com/DHDAXCW/istore
+# 25.12 使用 apk：需上游 istoreos/istore 0.2.x（支持 apk 及 repo-apk 源），DHDAXCW/istore 0.1.x 仅支持 opkg
+git clone --depth=1 https://github.com/istoreos/istore
 git clone --depth=1 https://github.com/Siriling/5G-Modem-Support && rm -rf 5G-Modem-Support/rooter
 git clone --depth=1 https://github.com/gdy666/luci-app-lucky
 # 25.12 的 luci 已移除 luci-app-socat
