@@ -33,11 +33,22 @@ popd
 
 # 25.12 官方 luci-app-adguardhome 无中文翻译，改用 dhdaxcw-app 中带中文的版本
 rm -rf feeds/luci/applications/luci-app-adguardhome package/feeds/luci/luci-app-adguardhome
+# 25.12 无 opkg：AdGuardHome 核心更新脚本改为优先从 /etc/apk/arch 识别架构
+cat > /tmp/agh-arch.sed <<'EOF'
+s|Archt="$(opkg info kernel .*$|Archt="$({ cat /etc/apk/arch 2>/dev/null \|\| opkg info kernel 2>/dev/null \| sed -n 's/^Architecture: *//p'; } \| head -n1 \| cut -d_ -f1)"|
+EOF
+sed -i -f /tmp/agh-arch.sed package/community/dhdaxcw-app/luci-app-adguardhome/root/usr/share/AdGuardHome/update_core.sh
 
 # 25.12: 改用官方 feeds 的 quectel-cm（5G-Modem-Support 自带的 1.6.7 哈希与新版 git 打包方式不符）
 rm -rf package/community/5G-Modem-Support/quectel_cm_5G
 # 25.12: git 源码包打包方式变化导致 PKG_MIRROR_HASH 不匹配，源码 commit 不变，跳过校验
 sed -i 's/^PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/' package/community/helloworld/shadowsocks-libev/Makefile
+# 25.12 无 opkg：luci-app-modem 用 opkg list-installed 判断拨号工具是否安装，改为兼容 apk
+cat > /tmp/modem-opkg.sed <<'EOF'
+s#opkg list-installed | grep -oE#{ apk list -I 2>/dev/null | awk '{print $1}' | sed -E 's/^(.+)-([0-9][^-]*(-r[0-9]+)?)$/\\\\1 - \\\\2/'; opkg list-installed 2>/dev/null; } | grep -oE#
+EOF
+sed -i -f /tmp/modem-opkg.sed package/community/5G-Modem-Support/luci-app-modem/luasrc/controller/modem.lua \
+    package/community/5G-Modem-Support/luci-app-modem/luasrc/model/cbi/modem/dial_config.lua
 # 25.12 (kernel 6.12): 移远 pcie_mhi 驱动适配新内核接口
 sed -i 's/\bno_llseek\b/noop_llseek/; s/static int mhi_match(struct device \*dev, struct device_driver \*drv)/static int mhi_match(struct device *dev, const struct device_driver *drv)/' \
     package/community/5G-Modem-Support/quectel_MHI/src/core/mhi_init.c
